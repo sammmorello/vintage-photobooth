@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vintage Photobooth</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+  <style>
+    /* lace border asset via Canva, for personal use */
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Cormorant Garamond', serif;
+      background-color: #6B7055;
+      color: #F5F0E8;
+      padding: 20px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.08;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .frame-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .frame-container {
+      position: relative;
+      width: 464px;
+      height: 650px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 500px) {
+      .frame-container {
+        width: 90vw;
+        height: calc(90vw * 1.3996);
+      }
+    }
+
+    #video, #photoCanvas {
+      position: absolute;
+      top: 11.5%;
+      left: 14%;
+      width: 72%;
+      height: 77%;
+      object-fit: cover;
+      transform: scaleX(-1);
+      z-index: 1;
+    }
+
+    #photoCanvas {
+      display: none;
+      transform: none;
+    }
+
+    .lace-frame {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .permission-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      font-style: italic;
+      font-size: 1.1rem;
+      padding: 20px;
+      max-width: 50%;
+      z-index: 15;
+      line-height: 1.6;
+    }
+
+    .countdown-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 5rem;
+      font-weight: 400;
+      font-style: italic;
+      color: #F5F0E8;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      z-index: 20;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .countdown-overlay.show {
+      animation: fadeInOut 1s ease-in-out forwards;
+    }
+
+    @keyframes fadeInOut {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+      15% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); }
+      80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(1.1); }
+    }
+
+    /* Arrow navigation */
+    .arrow-btn {
+      background: none;
+      border: none;
+      color: #F2EDE0;
+      font-size: 2.2rem;
+      cursor: pointer;
+      padding: 20px 10px;
+      opacity: 0.65;
+      transition: opacity 0.3s ease, transform 0.2s ease;
+      font-family: 'Cormorant Garamond', serif;
+      line-height: 1;
+    }
+
+    .arrow-btn:hover {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+
+    /* Snap button area */
+    .snap-controls {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 14px;
+    }
+
+    .timer-toggle {
+      font-size: 1rem;
+      font-style: italic;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      padding: 4px 12px;
+      background: none;
+      border: none;
+      color: #F5F0E8;
+      opacity: 0.55;
+      transition: all 0.3s ease;
+      font-family: 'Cormorant Garamond', serif;
+      width: 40px;
+      text-align: center;
+    }
+
+    .timer-toggle:hover {
+      opacity: 0.85;
+    }
+
+    .timer-toggle.active {
+      opacity: 1;
+      font-weight: 600;
+    }
+
+    .snap-btn {
+      width: 66px;
+      height: 66px;
+      border-radius: 50%;
+      background: linear-gradient(145deg, #F5F0E6, #E6E0D4);
+      border: 3px solid rgba(175, 165, 150, 0.5);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 2px 4px rgba(255, 255, 255, 0.6), inset 0 -2px 4px rgba(0, 0, 0, 0.05);
+      position: relative;
+    }
+
+    .snap-btn::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      border: 2px solid rgba(155, 145, 130, 0.4);
+    }
+
+    .snap-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .snap-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Post-capture buttons */
+    .post-capture-btns {
+      display: flex;
+      gap: 36px;
+      margin-top: 14px;
+    }
+
+    .text-btn {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.1rem;
+      font-style: italic;
+      letter-spacing: 0.1em;
+      background: none;
+      border: none;
+      color: #F5F0E8;
+      cursor: pointer;
+      padding: 8px 4px;
+      opacity: 0.8;
+      transition: all 0.3s ease;
+    }
+
+    .text-btn:hover {
+      opacity: 1;
+      font-weight: 600;
+    }
+
+    .rotate-btn {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 1.4rem;
+      background: none;
+      border: none;
+      color: #F5F0E8;
+      cursor: pointer;
+      padding: 4px 12px;
+      opacity: 0.55;
+      transition: all 0.3s ease;
+      width: 40px;
+      text-align: center;
+    }
+
+    .rotate-btn:hover {
+      opacity: 1;
+      transform: rotate(90deg);
+    }
+
+    /* Landscape mode styles */
+    .frame-container.landscape {
+      width: 650px;
+      height: 464px;
+    }
+
+    @media (max-width: 700px) {
+      .frame-container.landscape {
+        width: 95vw;
+        height: calc(95vw * 0.7145);
+      }
+    }
+
+    .frame-container.landscape #video,
+    .frame-container.landscape #photoCanvas {
+      top: 14%;
+      left: 11.5%;
+      width: 77%;
+      height: 72%;
+    }
+
+    .frame-container.landscape .lace-frame {
+      top: 50%;
+      left: 50%;
+      width: 464px;
+      height: 650px;
+      transform: translate(-50%, -50%) rotate(90deg);
+    }
+
+    @media (max-width: 700px) {
+      .frame-container.landscape .lace-frame {
+        width: calc(95vw * 0.7145);
+        height: 95vw;
+      }
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    #captureCanvas, #compositeCanvas {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="frame-wrapper">
+      <button class="arrow-btn" id="prevFilter">&#8249;</button>
+
+      <div class="frame-container landscape">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="photoCanvas"></canvas>
+        <img class="lace-frame" src="assets/lace-rectangleborder_transparent.png" alt="">
+
+        <div id="permissionMessage" class="permission-message hidden">
+          camera access needed to begin
+        </div>
+        <div id="countdown" class="countdown-overlay"></div>
+      </div>
+
+      <button class="arrow-btn" id="nextFilter">&#8250;</button>
+    </div>
+
+    <div id="liveControls" class="snap-controls">
+      <button class="timer-toggle" id="timerToggle">3s</button>
+      <button class="snap-btn" id="snapBtn"></button>
+      <button class="rotate-btn" id="rotateBtn">&#8635;</button>
+    </div>
+
+    <div id="capturedControls" class="post-capture-btns hidden">
+      <button class="text-btn" id="saveBtn">save</button>
+      <button class="text-btn" id="retakeBtn">retake</button>
+    </div>
+  </div>
+
+  <canvas id="captureCanvas"></canvas>
+  <canvas id="compositeCanvas"></canvas>
+
+  <script>
+    const video = document.getElementById('video');
+    const photoCanvas = document.getElementById('photoCanvas');
+    const captureCanvas = document.getElementById('captureCanvas');
+    const compositeCanvas = document.getElementById('compositeCanvas');
+    const permissionMessage = document.getElementById('permissionMessage');
+    const countdownEl = document.getElementById('countdown');
+    const liveControls = document.getElementById('liveControls');
+    const capturedControls = document.getElementById('capturedControls');
+    const snapBtn = document.getElementById('snapBtn');
+    const timerToggle = document.getElementById('timerToggle');
+    const saveBtn = document.getElementById('saveBtn');
+    const retakeBtn = document.getElementById('retakeBtn');
+    const prevFilterBtn = document.getElementById('prevFilter');
+    const nextFilterBtn = document.getElementById('nextFilter');
+    const laceFrame = document.querySelector('.lace-frame');
+    const frameContainer = document.querySelector('.frame-container');
+    const rotateBtn = document.getElementById('rotateBtn');
+
+    // Frame dimensions
+    const FRAME_WIDTH = 1429;
+    const FRAME_HEIGHT = 2000;
+
+    // Inner window insets for portrait mode (percentage of full frame)
+    const PORTRAIT_INSETS = { top: 0.115, left: 0.14, width: 0.72, height: 0.77 };
+    // Inner window insets for landscape mode (rotated 90°)
+    const LANDSCAPE_INSETS = { top: 0.14, left: 0.115, width: 0.77, height: 0.72 };
+
+    const filters = [
+      { name: 'none', value: 'none' },
+      { name: 'fade', value: 'contrast(0.85) brightness(1.1) saturate(0.7)' },
+      { name: 'sepia', value: 'sepia(0.7) contrast(0.9) brightness(1.05)' },
+      { name: 'noir', value: 'grayscale(1) contrast(1.1) brightness(0.95)' },
+      { name: 'mist', value: 'saturate(0.5) brightness(1.15) contrast(0.8) hue-rotate(10deg)' }
+    ];
+
+    let currentFilterIndex = 0;
+    let timerEnabled = false;
+    let stream = null;
+    let isLandscape = true;
+    let capturedInLandscape = false;
+
+    async function initCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 1280 }, height: { ideal: 1440 }, facingMode: 'user' }
+        });
+        video.srcObject = stream;
+        await video.play();
+        permissionMessage.classList.add('hidden');
+      } catch (err) {
+        console.error('Camera error:', err);
+        permissionMessage.classList.remove('hidden');
+        permissionMessage.textContent = 'camera access needed to begin';
+      }
+    }
+
+    function applyFilter() {
+      const filter = filters[currentFilterIndex];
+      const val = filter.value === 'none' ? '' : filter.value;
+      video.style.filter = val;
+      photoCanvas.style.filter = val;
+    }
+
+    function nextFilter() {
+      currentFilterIndex = (currentFilterIndex + 1) % filters.length;
+      applyFilter();
+    }
+
+    function prevFilter() {
+      currentFilterIndex = (currentFilterIndex - 1 + filters.length) % filters.length;
+      applyFilter();
+    }
+
+    function toggleTimer() {
+      timerEnabled = !timerEnabled;
+      timerToggle.classList.toggle('active', timerEnabled);
+    }
+
+    function toggleOrientation() {
+      isLandscape = !isLandscape;
+      frameContainer.classList.toggle('landscape', isLandscape);
+    }
+
+    function capturePhoto() {
+      capturedInLandscape = isLandscape;
+
+      const ctx = captureCanvas.getContext('2d');
+      captureCanvas.width = video.videoWidth;
+      captureCanvas.height = video.videoHeight;
+
+      const filterValue = filters[currentFilterIndex].value;
+      ctx.filter = filterValue === 'none' ? 'none' : filterValue;
+
+      ctx.translate(captureCanvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      photoCanvas.width = captureCanvas.width;
+      photoCanvas.height = captureCanvas.height;
+      photoCanvas.getContext('2d').drawImage(captureCanvas, 0, 0);
+
+      video.style.display = 'none';
+      photoCanvas.style.display = 'block';
+
+      liveControls.classList.add('hidden');
+      prevFilterBtn.classList.add('hidden');
+      nextFilterBtn.classList.add('hidden');
+      capturedControls.classList.remove('hidden');
+    }
+
+    function startCountdown() {
+      let count = 3;
+      liveControls.classList.add('hidden');
+
+      const showCount = () => {
+        countdownEl.textContent = count;
+        countdownEl.classList.remove('show');
+        void countdownEl.offsetWidth;
+        countdownEl.classList.add('show');
+      };
+
+      showCount();
+      const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          showCount();
+        } else {
+          clearInterval(interval);
+          countdownEl.classList.remove('show');
+          capturePhoto();
+        }
+      }, 1000);
+    }
+
+    function handleSnap() {
+      timerEnabled ? startCountdown() : capturePhoto();
+    }
+
+    function retakePhoto() {
+      video.style.display = 'block';
+      photoCanvas.style.display = 'none';
+      liveControls.classList.remove('hidden');
+      prevFilterBtn.classList.remove('hidden');
+      nextFilterBtn.classList.remove('hidden');
+      capturedControls.classList.add('hidden');
+    }
+
+    async function savePhoto() {
+      // Output canvas dimensions
+      const outputW = capturedInLandscape ? 1400 : 900;
+      const outputH = capturedInLandscape ? 900 : 1200;
+
+      compositeCanvas.width = outputW;
+      compositeCanvas.height = outputH;
+      const ctx = compositeCanvas.getContext('2d');
+
+      // Step 1: Fill with olive green background
+      ctx.fillStyle = '#6B7055';
+      ctx.fillRect(0, 0, outputW, outputH);
+
+      // Step 2: Add vintage noise texture
+      const noiseCanvas = document.createElement('canvas');
+      noiseCanvas.width = outputW;
+      noiseCanvas.height = outputH;
+      const noiseCtx = noiseCanvas.getContext('2d');
+      const imageData = noiseCtx.createImageData(outputW, outputH);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const noise = Math.random() * 50 | 0;
+        data[i] = noise;
+        data[i + 1] = noise;
+        data[i + 2] = noise;
+        data[i + 3] = Math.random() * 40 | 0;
+      }
+      noiseCtx.putImageData(imageData, 0, 0);
+      ctx.drawImage(noiseCanvas, 0, 0);
+
+      // Calculate frame size to fit nicely centered on canvas
+      const frameAspect = capturedInLandscape ? (FRAME_HEIGHT / FRAME_WIDTH) : (FRAME_WIDTH / FRAME_HEIGHT);
+      let frameW, frameH;
+      if (capturedInLandscape) {
+        frameH = outputH * 0.88;
+        frameW = frameH * frameAspect;
+      } else {
+        frameH = outputH * 0.85;
+        frameW = frameH * frameAspect;
+      }
+
+      // Center the frame on the canvas
+      const frameX = (outputW - frameW) / 2;
+      const frameY = (outputH - frameH) / 2;
+
+      // Get insets for the captured orientation
+      const insets = capturedInLandscape ? LANDSCAPE_INSETS : PORTRAIT_INSETS;
+
+      // Calculate inner window position and size in canvas coordinates
+      const innerX = frameX + frameW * insets.left;
+      const innerY = frameY + frameH * insets.top;
+      const innerW = frameW * insets.width;
+      const innerH = frameH * insets.height;
+
+      // Step 2: Clip to inner window and draw camera photo
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(innerX, innerY, innerW, innerH);
+      ctx.clip();
+
+      // Draw photo with cover behavior within the clipped area
+      const photoAspect = captureCanvas.width / captureCanvas.height;
+      const innerAspect = innerW / innerH;
+      let dw, dh, dx, dy;
+      if (photoAspect > innerAspect) {
+        dh = innerH;
+        dw = dh * photoAspect;
+        dx = innerX + (innerW - dw) / 2;
+        dy = innerY;
+      } else {
+        dw = innerW;
+        dh = dw / photoAspect;
+        dx = innerX;
+        dy = innerY + (innerH - dh) / 2;
+      }
+      ctx.drawImage(captureCanvas, dx, dy, dw, dh);
+      ctx.restore();
+
+      // Step 3: Draw lace frame on top, centered
+      const frameImg = new Image();
+      frameImg.onload = () => {
+        if (capturedInLandscape) {
+          // Draw rotated frame for landscape
+          ctx.save();
+          ctx.translate(frameX + frameW / 2, frameY + frameH / 2);
+          ctx.rotate(Math.PI / 2);
+          // After rotation, swap dimensions for drawing
+          ctx.drawImage(frameImg, -frameH / 2, -frameW / 2, frameH, frameW);
+          ctx.restore();
+        } else {
+          // Draw frame normally for portrait
+          ctx.drawImage(frameImg, frameX, frameY, frameW, frameH);
+        }
+        compositeCanvas.toBlob(blob => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'photobooth.png';
+          a.click();
+        }, 'image/png');
+      };
+      frameImg.src = 'assets/lace-rectangleborder_transparent.png';
+    }
+
+    snapBtn.addEventListener('click', handleSnap);
+    timerToggle.addEventListener('click', toggleTimer);
+    rotateBtn.addEventListener('click', toggleOrientation);
+    retakeBtn.addEventListener('click', retakePhoto);
+    saveBtn.addEventListener('click', savePhoto);
+    prevFilterBtn.addEventListener('click', prevFilter);
+    nextFilterBtn.addEventListener('click', nextFilter);
+
+    initCamera();
+  </script>
+</body>
+</html>
