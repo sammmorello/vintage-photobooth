@@ -592,10 +592,17 @@
           ctx.drawImage(frameImg, frameX, frameY, frameW, frameH);
         }
         compositeCanvas.toBlob(blob => {
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'photobooth.png';
-          a.click();
+          const url = URL.createObjectURL(blob);
+          const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+          if (isMobile) {
+            window.open(url, '_blank');
+          } else {
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'photobooth.png';
+            a.click();
+          }
         }, 'image/png');
       };
       frameImg.src = 'assets/lace-rectangleborder_transparent.png';
